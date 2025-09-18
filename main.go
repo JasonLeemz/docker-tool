@@ -45,7 +45,7 @@ func initLogger() {
 
 func main() {
 	// 命令行参数
-	var configFile = flag.String("config", "config.yaml", "配置文件路径")
+	var configFile = flag.String("config", "conf/config.yaml", "配置文件路径")
 	flag.Parse()
 
 	// 初始化日志系统

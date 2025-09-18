@@ -27,7 +27,7 @@ if [ ! -f "docker-tool" ]; then
 fi
 
 # 检查配置文件是否存在
-CONFIG_FILE="config.yaml"
+CONFIG_FILE="conf/config.yaml"
 if [ ! -f "$CONFIG_FILE" ]; then
     echo "错误: 未找到配置文件 $CONFIG_FILE"
     echo "请确保配置文件存在"

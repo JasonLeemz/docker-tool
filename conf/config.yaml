@@ -37,7 +37,7 @@ services:
   - name: "searxng"
     type: "http"
     container_name: "searxng"
-    domain: "searxng.ybdx.lmz"
+    domain: "searxng.ybdx.lmza"
     path: "/"
     # port作为查找键：用来在Docker端口映射中找到对应的宿主机端 口
     # 自动转换：程序自动将容器内部端口转换为宿主机端口
