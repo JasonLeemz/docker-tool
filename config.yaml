@@ -1,0 +1,55 @@
+# Docker Tool 配置文件
+global:
+  nginx_config_dir: "/Users/limingze/docker/nginx-ui/nginx/sites-available"
+  stream_config_dir: "/Users/limingze/docker/nginx-ui/nginx/streams-available"
+  nginx_reload_cmd: "docker exec nginx-ui nginx -s reload"
+  
+  # 默认代理配置
+  default_proxy:
+    client_max_body_size: "2048M"
+    proxy_http_version: "1.1"
+    proxy_headers:
+      - "Upgrade $http_upgrade"
+      - "Connection upgrade"
+      - "X-Real-IP $remote_addr"
+      - "X-Forwarded-For $proxy_add_x_forwarded_for"
+      - "X-Forwarded-Proto $scheme"
+      - "X-Forwarded-Host $http_host"
+    proxy_redirect: "off"
+
+# 服务配置
+services:
+  # HTTP服务配置示例
+  - name: "portainer"
+    type: "http"
+    container_name: "portainer"
+    domain: "portainer.ybdx.lmz"
+    path: "/"
+    port: 9000
+    upstream_name: "portainer"
+  - name: "npm"
+    type: "http"
+    container_name: "nginx-ui"
+    domain: "npm.ybdx.lmz"
+    path: "/"
+    port: 8000
+    upstream_name: "npm"
+  - name: "searxng"
+    type: "http"
+    container_name: "searxng"
+    domain: "searxng.ybdx.lmz"
+    path: "/"
+    # port作为查找键：用来在Docker端口映射中找到对应的宿主机端 口
+    # 自动转换：程序自动将容器内部端口转换为宿主机端口
+    # 保持一致性：无论什么网络模式，配置文件中的port都是容器内部端口
+    port: 8080
+    upstream_name: "searxng"
+
+
+  # Stream服务配置示例
+  - name: "mysql-service"
+    type: "stream"
+    container_name: "mysql-db"
+    listen_port: 3306
+    container_port: 3306
+    upstream_name: "mysql_backend"
