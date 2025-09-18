@@ -19,37 +19,144 @@ global:
 
 # 服务配置
 services:
-  # HTTP服务配置示例
+  # HTTP服务配置
+  - name: "ddns"
+    type: "http"
+    container_name: "ddns"
+    domain: "ddns.ybdx.xyz"
+    path: "/"
+    port: 9876
+    upstream_name: "ddns"
+
+  - name: "mtube"
+    type: "http"
+    container_name: "mtube"
+    domain: "mtube.ybdx.xyz"
+    path: "/"
+    port: 8096
+    upstream_name: "mtube"
+
+  - name: "nastool"
+    type: "http"
+    container_name: "nastool"
+    domain: "nastool.ybdx.xyz"
+    path: "/"
+    port: 3000
+    upstream_name: "nastool"
+
+  - name: "nastool3"
+    type: "http"
+    container_name: "nastool3"
+    domain: "nastool3.ybdx.xyz"
+    path: "/"
+    port: 3000
+    upstream_name: "nastool3"
+
   - name: "portainer"
     type: "http"
     container_name: "portainer"
-    domain: "portainer.ybdx.lmz"
+    domain: "portainer.ybdx.xyz"
     path: "/"
     port: 9000
     upstream_name: "portainer"
-  - name: "npm"
+
+  - name: "yacd"
     type: "http"
-    container_name: "nginx-ui"
-    domain: "npm.ybdx.lmz"
+    container_name: "yacd"
+    domain: "yacd.ybdx.xyz"
     path: "/"
-    port: 8000
-    upstream_name: "npm"
-  - name: "searxng"
+    port: 80
+    upstream_name: "yacd"
+
+  - name: "clash"
     type: "http"
-    container_name: "searxng"
-    domain: "searxng.ybdx.lmza"
+    container_name: "clash"
+    domain: "clash.ybdx.xyz"
     path: "/"
-    # port作为查找键：用来在Docker端口映射中找到对应的宿主机端 口
-    # 自动转换：程序自动将容器内部端口转换为宿主机端口
-    # 保持一致性：无论什么网络模式，配置文件中的port都是容器内部端口
+    port: 9090
+    upstream_name: "clash"
+
+  - name: "qljd"
+    type: "http"
+    container_name: "qljd"
+    domain: "qljd.ybdx.xyz"
+    path: "/"
+    port: 5700
+    upstream_name: "qljd"
+
+  - name: "qlqd"
+    type: "http"
+    container_name: "qlqd"
+    domain: "qlqd.ybdx.xyz"
+    path: "/"
+    port: 5700
+    upstream_name: "qlqd"
+
+  - name: "bark"
+    type: "http"
+    container_name: "bark"
+    domain: "bark.ybdx.xyz"
+    path: "/"
     port: 8080
-    upstream_name: "searxng"
+    upstream_name: "bark"
 
+  - name: "whisper"
+    type: "http"
+    container_name: "whisper"
+    domain: "whisper.ybdx.xyz"
+    path: "/"
+    port: 8123
+    upstream_name: "whisper"
 
-  # Stream服务配置示例
-  - name: "mysql-service"
+  - name: "kibana"
+    type: "http"
+    container_name: "kibana"
+    domain: "kibana.ybdx.xyz"
+    path: "/"
+    port: 5601
+    upstream_name: "kibana"
+
+  - name: "nacos"
+    type: "http"
+    container_name: "nacos"
+    domain: "nacos.ybdx.xyz"
+    path: "/"
+    port: 8848
+    upstream_name: "nacos"
+
+  - name: "moviepilot"
+    type: "http"
+    container_name: "moviepilot"
+    domain: "moviepilot.ybdx.xyz"
+    path: "/"
+    port: 3000
+    upstream_name: "moviepilot"
+
+  # Stream服务配置
+  - name: "clash-proxy-port1"
     type: "stream"
-    container_name: "mysql-db"
+    container_name: "clash"
+    listen_port: 7890
+    container_port: 7890
+    upstream_name: "clash_proxy1"
+
+  - name: "clash-proxy-port2"
+    type: "stream"
+    container_name: "clash"
+    listen_port: 7891
+    container_port: 7891
+    upstream_name: "clash_proxy2"
+
+  - name: "mariadb"
+    type: "stream"
+    container_name: "mariadb"
     listen_port: 3306
     container_port: 3306
-    upstream_name: "mysql_backend"
+    upstream_name: "mariadb_backend"
+
+  - name: "vlmcsd"
+    type: "stream"
+    container_name: "vlmcsd"
+    listen_port: 1688
+    container_port: 1688
+    upstream_name: "vlmcsd_backend"
