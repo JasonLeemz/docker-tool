@@ -1,13 +1,16 @@
 package nginx
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
+	"text/template"
 
 	"github.com/docker/go-connections/nat"
 
@@ -43,6 +46,58 @@ type UpstreamServer struct {
 	IP   string
 	Port nat.Port
 }
+
+// HTTPTemplateData HTTP配置模板数据
+type HTTPTemplateData struct {
+	ServiceName          string
+	Domain               string
+	Path                 string
+	Upstream             []UpstreamServer
+	EnableWebSocket      bool
+	ClientMaxBodySize    string
+	ProxyHTTPVersion     string
+	ProxyHeaders         []string
+	ProxyRedirect        string
+	// SSL 相关配置
+	EnableSSL            bool
+	SSLCertificate       string
+	SSLCertificateKey    string
+	ForceHTTPS           bool
+}
+
+// StreamTemplateData Stream配置模板数据
+type StreamTemplateData struct {
+	ServiceName string
+	ListenPort  int
+	Upstream    []UpstreamServer
+}
+
+// loadTemplate 从文件加载模板内容
+func (m *Manager) loadTemplate(templateFile string) (string, error) {
+	if templateFile == "" {
+		return "", fmt.Errorf("模板文件路径为空")
+	}
+
+	// 检查文件是否存在
+	if _, err := os.Stat(templateFile); os.IsNotExist(err) {
+		return "", fmt.Errorf("模板文件不存在: %s", templateFile)
+	}
+
+	// 读取文件内容
+	file, err := os.Open(templateFile)
+	if err != nil {
+		return "", fmt.Errorf("打开模板文件失败: %w", err)
+	}
+	defer file.Close()
+
+	content, err := io.ReadAll(file)
+	if err != nil {
+		return "", fmt.Errorf("读取模板文件失败: %w", err)
+	}
+
+	return string(content), nil
+}
+
 
 // NewManager 创建nginx管理器
 func NewManager(cfg *config.Config) *Manager {
@@ -197,74 +252,85 @@ func (m *Manager) generateStreamConfig(streamConfig *StreamConfig) error {
 
 // buildHTTPConfigContent 构建HTTP配置内容
 func (m *Manager) buildHTTPConfigContent(httpConfig *HTTPConfig) string {
-	var content strings.Builder
-
-	// 构建upstream块
-	content.WriteString(fmt.Sprintf("upstream %s {\n", httpConfig.ServiceName))
-	for _, server := range httpConfig.Upstream {
-		content.WriteString(fmt.Sprintf("    server %s:%s;\n", server.IP, server.Port.Port()))
-	}
-	content.WriteString("}\n\n")
-
-	// 构建server块
-	content.WriteString("server {\n")
-	content.WriteString("    listen 80;\n")
-	content.WriteString(fmt.Sprintf("    server_name %s;\n", httpConfig.Domain))
-	content.WriteString("\n")
-
-	// 构建location块
-	content.WriteString(fmt.Sprintf("    location %s {\n", httpConfig.Path))
-
 	// 使用服务配置的代理配置，如果没有则使用全局默认配置
 	proxyConfig := httpConfig.ProxyConfig
 	if proxyConfig == nil {
 		proxyConfig = &m.config.Global.DefaultProxy
 	}
 
-	// 添加代理配置
-	if proxyConfig.ClientMaxBodySize != "" {
-		content.WriteString(fmt.Sprintf("        client_max_body_size %s;\n", proxyConfig.ClientMaxBodySize))
+	// 准备模板数据
+	templateData := HTTPTemplateData{
+		ServiceName:          httpConfig.ServiceName,
+		Domain:               httpConfig.Domain,
+		Path:                 httpConfig.Path,
+		Upstream:             httpConfig.Upstream,
+		EnableWebSocket:      proxyConfig.EnableWebSocket,
+		ClientMaxBodySize:    proxyConfig.ClientMaxBodySize,
+		ProxyHTTPVersion:     proxyConfig.ProxyHTTPVersion,
+		ProxyHeaders:         proxyConfig.ProxyHeaders,
+		ProxyRedirect:        proxyConfig.ProxyRedirect,
+		// SSL 配置
+		EnableSSL:            m.config.Global.SSLCertPath != "" && m.config.Global.SSLKeyPath != "",
+		SSLCertificate:       m.config.Global.SSLCertPath,
+		SSLCertificateKey:    m.config.Global.SSLKeyPath,
+		ForceHTTPS:           m.config.Global.ForceHTTPS,
 	}
 
-	content.WriteString(fmt.Sprintf("        proxy_pass          http://%s/;\n", httpConfig.ServiceName))
-
-	if proxyConfig.ProxyHTTPVersion != "" {
-		content.WriteString(fmt.Sprintf("        proxy_http_version %s;\n", proxyConfig.ProxyHTTPVersion))
+	// 加载模板内容
+	templateContent, err := m.loadTemplate(m.config.Global.HTTPTemplateFile)
+	if err != nil {
+		log.Printf("加载HTTP配置模板失败: %v", err)
+		return ""
 	}
 
-	// 添加代理头
-	for _, header := range proxyConfig.ProxyHeaders {
-		content.WriteString(fmt.Sprintf("        proxy_set_header %s;\n", header))
+	// 解析模板
+	tmpl, err := template.New("httpConfig").Parse(templateContent)
+	if err != nil {
+		log.Printf("解析HTTP配置模板失败: %v", err)
+		return ""
 	}
 
-	if proxyConfig.ProxyRedirect != "" {
-		content.WriteString(fmt.Sprintf("        proxy_redirect %s;\n", proxyConfig.ProxyRedirect))
+	// 渲染模板
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, templateData); err != nil {
+		log.Printf("渲染HTTP配置模板失败: %v", err)
+		return ""
 	}
 
-	content.WriteString("    }\n")
-	content.WriteString("}\n")
-
-	return content.String()
+	return buf.String()
 }
 
 // buildStreamConfigContent 构建Stream配置内容
 func (m *Manager) buildStreamConfigContent(streamConfig *StreamConfig) string {
-	var content strings.Builder
-
-	// 构建upstream块
-	content.WriteString(fmt.Sprintf("upstream %s {\n", streamConfig.ServiceName))
-	for _, server := range streamConfig.Upstream {
-		content.WriteString(fmt.Sprintf("    server %s:%s;\n", server.IP, server.Port.Port()))
+	// 准备模板数据
+	templateData := StreamTemplateData{
+		ServiceName: streamConfig.ServiceName,
+		ListenPort:  streamConfig.ListenPort,
+		Upstream:    streamConfig.Upstream,
 	}
-	content.WriteString("}\n\n")
 
-	// 构建server块
-	content.WriteString("server {\n")
-	content.WriteString(fmt.Sprintf("    listen %d;\n", streamConfig.ListenPort))
-	content.WriteString(fmt.Sprintf("    proxy_pass %s;\n", streamConfig.ServiceName))
-	content.WriteString("}\n")
+	// 加载模板内容
+	templateContent, err := m.loadTemplate(m.config.Global.StreamTemplateFile)
+	if err != nil {
+		log.Printf("加载Stream配置模板失败: %v", err)
+		return ""
+	}
 
-	return content.String()
+	// 解析模板
+	tmpl, err := template.New("streamConfig").Parse(templateContent)
+	if err != nil {
+		log.Printf("解析Stream配置模板失败: %v", err)
+		return ""
+	}
+
+	// 渲染模板
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, templateData); err != nil {
+		log.Printf("渲染Stream配置模板失败: %v", err)
+		return ""
+	}
+
+	return buf.String()
 }
 
 // deleteHTTPConfig 删除HTTP配置文件

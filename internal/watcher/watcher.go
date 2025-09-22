@@ -251,7 +251,7 @@ func (w *Watcher) updateNginxConfig(service *config.ServiceConfig, container *ty
 	if container != nil {
 		containerIP = w.getContainerIP(container)
 		containerPort = w.getContainerPort(container, service)
-		
+
 		// 检查IP和端口是否有效
 		if containerIP == "" {
 			log.Printf("警告: 服务 %s 无法获取容器IP，跳过配置更新", service.Name)
@@ -283,7 +283,7 @@ func (w *Watcher) getContainerIP(container *types.ContainerJSON) string {
 	// 检查是否是host网络模式
 	if _, exists := container.NetworkSettings.Networks["host"]; exists {
 		// host网络模式，返回宿主机IP
-		return "127.0.0.1"
+		return w.config.Global.HostIP
 	}
 
 	// 优先获取macvlan网络的IP
@@ -293,9 +293,9 @@ func (w *Watcher) getContainerIP(container *types.ContainerJSON) string {
 		}
 	}
 
-	// 对于bridge网络，返回127.0.0.1（使用宿主机端口映射）
+	// 对于bridge网络，返回宿主机IP（使用宿主机端口映射）
 	if _, exists := container.NetworkSettings.Networks["bridge"]; exists {
-		return "127.0.0.1"
+		return w.config.Global.HostIP
 	}
 
 	return ""
@@ -322,13 +322,13 @@ func (w *Watcher) getContainerPort(container *types.ContainerJSON, service *conf
 		// bridge网络模式，查找宿主机端口映射
 		portStr := fmt.Sprintf("%d/tcp", targetPort)
 		port := nat.Port(portStr)
-		
+
 		if portBindings, exists := container.NetworkSettings.Ports[port]; exists && len(portBindings) > 0 {
 			// 返回宿主机端口
 			hostPort := portBindings[0].HostPort
 			return nat.Port(fmt.Sprintf("%s/tcp", hostPort))
 		}
-		
+
 		// 如果没有找到TCP端口，尝试UDP
 		portStr = fmt.Sprintf("%d/udp", targetPort)
 		port = nat.Port(portStr)
@@ -370,7 +370,7 @@ func (w *Watcher) watchConfigFile(ctx context.Context) {
 		case <-ticker.C:
 			if w.config.HasChanged() {
 				log.Println("检测到配置文件变化，重新加载配置...")
-				
+
 				// 重新加载配置
 				if err := w.config.Reload(); err != nil {
 					log.Printf("警告: 重新加载配置文件失败，继续使用当前配置: %v", err)
@@ -381,7 +381,7 @@ func (w *Watcher) watchConfigFile(ctx context.Context) {
 				w.nginxMgr.UpdateConfig(w.config)
 
 				log.Println("成功: 配置文件已重新加载，重新扫描所有容器...")
-				
+
 				// 重新扫描所有现有容器
 				go w.checkExistingContainers(ctx)
 			}

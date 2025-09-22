@@ -1,0 +1,62 @@
+# Nginx UI Template Start
+name = "Reverse Proxy"
+author = "@0xJacky"
+description = { en = "Reverse Proxy Config", zh_CN = "反向代理配置"}
+
+[variables.enableWebSocket]
+type = "boolean"
+name = { en = "Enable WebSocket", zh_CN = "启用 WebSocket"}
+value = true
+
+[variables.clientMaxBodySize]
+type = "string"
+name = { en = "Client Max Body Size", zh_CN = "客户端最大请求内容大小"}
+value = "1000m"
+
+[variables.scheme]
+type = "select"
+name = { en = "Scheme", zh_CN = "协议"}
+value = "http"
+mask = { http = { en = "HTTP" }, https = { en = "HTTPS" } }
+
+[variables.host]
+type = "string"
+name = { en = "Host", zh_CN = "主机"}
+value = "127.0.0.1"
+
+[variables.port]
+type = "string"
+name = { en = "Port", zh_CN = "端口"}
+value = 9000
+# Nginx UI Template End
+
+# Nginx UI Custom Start
+{{- if .enableWebSocket }}
+map $http_upgrade $connection_upgrade {
+    default upgrade;
+    '' close;
+}
+{{- end }}
+# Nginx UI Custom End
+
+if ($host != $server_name) {
+    return 404;
+}
+
+location / {
+        {{ if .enableWebSocket }}
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+        {{ end }}
+
+        client_max_body_size {{ .clientMaxBodySize }};
+
+        proxy_redirect off;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        proxy_pass {{ .scheme }}://{{ .host }}:{{ .port }}/;
+ }

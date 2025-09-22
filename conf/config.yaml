@@ -3,14 +3,24 @@ global:
   nginx_config_dir: "/Users/limingze/docker/nginx-ui/nginx/sites-available"
   stream_config_dir: "/Users/limingze/docker/nginx-ui/nginx/streams-available"
   nginx_reload_cmd: "docker exec nginx-ui nginx -s reload"
-  
+  http_template_file: "conf/http.conf.tpl"
+  stream_template_file: "conf/stream.conf.tpl"
+  # 宿主机IP
+  host_ip: "127.0.0.1"
+  # ssl公钥路径
+  ssl_certificate: "/etc/nginx/ssl/*.ybdx.xyz_ybdx.xyz_2048/fullchain.cer"
+  # ssl私钥路径
+  ssl_certificate_key: "/etc/nginx/ssl/*.ybdx.xyz_ybdx.xyz_2048/private.key"
+  # 强制走https
+  force_https: true
+
   # 默认代理配置
   default_proxy:
+    enable_websocket: true
     client_max_body_size: "2048M"
     proxy_http_version: "1.1"
     proxy_headers:
-      - "Upgrade $http_upgrade"
-      - "Connection upgrade"
+      - "Host $host"
       - "X-Real-IP $remote_addr"
       - "X-Forwarded-For $proxy_add_x_forwarded_for"
       - "X-Forwarded-Proto $scheme"
@@ -20,6 +30,27 @@ global:
 # 服务配置
 services:
   # HTTP服务配置
+  - name: "npm"
+    type: "http"
+    container_name: "nginx-ui"
+    domain: "npm.ybdx.xyz"
+    path: "/"
+    port: 9000
+    upstream_name: "npm"
+  - name: "portainer"
+    type: "http"
+    container_name: "portainer"
+    domain: "portainer.ybdx.xyz"
+    path: "/"
+    port: 9000
+    upstream_name: "portainer"
+  - name: "qb"
+    type: "http"
+    container_name: "qb"
+    domain: "qb.ybdx.xyz"
+    path: "/"
+    port: 8080
+    upstream_name: "qb"
   - name: "ddns"
     type: "http"
     container_name: "ddns"

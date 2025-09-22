@@ -11,7 +11,7 @@ import (
 
 // Config 主配置结构
 type Config struct {
-	Global   GlobalConfig   `yaml:"global"`
+	Global   GlobalConfig    `yaml:"global"`
 	Services []ServiceConfig `yaml:"services"`
 	filePath string
 	lastMod  time.Time
@@ -19,28 +19,39 @@ type Config struct {
 
 // GlobalConfig 全局配置
 type GlobalConfig struct {
-	NginxConfigDir  string      `yaml:"nginx_config_dir"`
-	StreamConfigDir string      `yaml:"stream_config_dir"`
-	NginxReloadCmd  string      `yaml:"nginx_reload_cmd"`
-	DefaultProxy    ProxyConfig `yaml:"default_proxy"`
+	NginxConfigDir     string      `yaml:"nginx_config_dir"`
+	StreamConfigDir    string      `yaml:"stream_config_dir"`
+	NginxReloadCmd     string      `yaml:"nginx_reload_cmd"`
+	HTTPTemplateFile   string      `yaml:"http_template_file,omitempty"`
+	StreamTemplateFile string      `yaml:"stream_template_file,omitempty"`
+	DefaultProxy       ProxyConfig `yaml:"default_proxy"`
+	// 宿主机IP
+	HostIP string `yaml:"host_ip"`
+	// ssl公钥路径
+	SSLCertPath string `yaml:"ssl_certificate,omitempty"`
+	// ssl私钥路径
+	SSLKeyPath string `yaml:"ssl_certificate_key,omitempty"`
+	// 强制走https
+	ForceHTTPS bool `yaml:"force_https,omitempty"`
 }
 
 // ServiceConfig 服务配置
 type ServiceConfig struct {
-	Name           string       `yaml:"name"`
-	Type           string       `yaml:"type"` // http 或 stream
-	ContainerName  string       `yaml:"container_name"`
-	Domain         string       `yaml:"domain,omitempty"`
-	Path           string       `yaml:"path,omitempty"`
-	Port           int          `yaml:"port,omitempty"`
-	ListenPort     int          `yaml:"listen_port,omitempty"`
-	ContainerPort  int          `yaml:"container_port,omitempty"`
-	UpstreamName   string       `yaml:"upstream_name"`
-	ProxyConfig    *ProxyConfig `yaml:"proxy_config,omitempty"`
+	Name          string       `yaml:"name"`
+	Type          string       `yaml:"type"` // http 或 stream
+	ContainerName string       `yaml:"container_name"`
+	Domain        string       `yaml:"domain,omitempty"`
+	Path          string       `yaml:"path,omitempty"`
+	Port          int          `yaml:"port,omitempty"`
+	ListenPort    int          `yaml:"listen_port,omitempty"`
+	ContainerPort int          `yaml:"container_port,omitempty"`
+	UpstreamName  string       `yaml:"upstream_name"`
+	ProxyConfig   *ProxyConfig `yaml:"proxy_config,omitempty"`
 }
 
 // ProxyConfig 代理配置
 type ProxyConfig struct {
+	EnableWebSocket   bool     `yaml:"enable_websocket,omitempty"`
 	ClientMaxBodySize string   `yaml:"client_max_body_size,omitempty"`
 	ProxyHTTPVersion  string   `yaml:"proxy_http_version,omitempty"`
 	ProxyHeaders      []string `yaml:"proxy_headers,omitempty"`
@@ -150,7 +161,7 @@ func (c *Config) ValidateService(service *ServiceConfig) error {
 func (c *Config) GetServiceByContainerName(containerName string) *ServiceConfig {
 	// 去掉容器名称前的 / 符号
 	normalizedName := strings.TrimPrefix(containerName, "/")
-	
+
 	for _, service := range c.Services {
 		// 也去掉配置中的容器名称前的 / 符号进行比较
 		configName := strings.TrimPrefix(service.ContainerName, "/")
