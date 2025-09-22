@@ -231,6 +231,35 @@ func (w *Watcher) checkExistingContainers(ctx context.Context) {
 	}
 
 	log.Printf("已处理 %d 个运行中的容器", processedCount)
+	
+	// 处理SNI配置（不依赖容器）
+	w.processSNIServices()
+}
+
+// processSNIServices 处理SNI服务配置（不依赖容器）
+func (w *Watcher) processSNIServices() {
+	log.Println("处理SNI服务配置...")
+	
+	for _, service := range w.config.Services {
+		// 只处理启用了SNI的stream服务
+		if service.Type == "stream" && service.EnableSNI {
+			log.Printf("处理SNI服务: %s", service.Name)
+			
+			// 验证服务配置
+			if err := w.config.ValidateService(&service); err != nil {
+				log.Printf("警告: SNI服务 %s 配置无效，跳过处理: %v", service.Name, err)
+				continue
+			}
+			
+			// 为SNI服务生成配置（传递空的容器信息）
+			port, _ := nat.NewPort("tcp", fmt.Sprintf("%d", service.ContainerPort))
+			if err := w.nginxMgr.UpdateService(&service, "", port); err != nil {
+				log.Printf("警告: 生成SNI服务 %s 配置失败: %v", service.Name, err)
+			} else {
+				log.Printf("成功: 已生成SNI服务 %s 的配置", service.Name)
+			}
+		}
+	}
 }
 
 // getContainerInfo 获取容器详细信息
