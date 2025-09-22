@@ -19,12 +19,13 @@ type Config struct {
 
 // GlobalConfig 全局配置
 type GlobalConfig struct {
-	NginxConfigDir     string      `yaml:"nginx_config_dir"`
-	StreamConfigDir    string      `yaml:"stream_config_dir"`
-	NginxReloadCmd     string      `yaml:"nginx_reload_cmd"`
-	HTTPTemplateFile   string      `yaml:"http_template_file,omitempty"`
-	StreamTemplateFile string      `yaml:"stream_template_file,omitempty"`
-	DefaultProxy       ProxyConfig `yaml:"default_proxy"`
+	NginxConfigDir        string      `yaml:"nginx_config_dir"`
+	StreamConfigDir       string      `yaml:"stream_config_dir"`
+	NginxReloadCmd        string      `yaml:"nginx_reload_cmd"`
+	HTTPTemplateFile      string      `yaml:"http_template_file,omitempty"`
+	StreamTemplateFile    string      `yaml:"stream_template_file,omitempty"`
+	StreamSNITemplateFile string      `yaml:"stream_sni_template_file,omitempty"`
+	DefaultProxy          ProxyConfig `yaml:"default_proxy"`
 	// 宿主机IP
 	HostIP string `yaml:"host_ip"`
 	// ssl公钥路径
@@ -37,16 +38,20 @@ type GlobalConfig struct {
 
 // ServiceConfig 服务配置
 type ServiceConfig struct {
-	Name          string       `yaml:"name"`
-	Type          string       `yaml:"type"` // http 或 stream
-	ContainerName string       `yaml:"container_name"`
-	Domain        string       `yaml:"domain,omitempty"`
-	Path          string       `yaml:"path,omitempty"`
-	Port          int          `yaml:"port,omitempty"`
-	ListenPort    int          `yaml:"listen_port,omitempty"`
-	ContainerPort int          `yaml:"container_port,omitempty"`
-	UpstreamName  string       `yaml:"upstream_name"`
-	ProxyConfig   *ProxyConfig `yaml:"proxy_config,omitempty"`
+	Name            string                 `yaml:"name"`
+	Type            string                 `yaml:"type"` // http 或 stream
+	ContainerName   string                 `yaml:"container_name"`
+	Domain          string                 `yaml:"domain,omitempty"`
+	Path            string                 `yaml:"path,omitempty"`
+	Port            int                    `yaml:"port,omitempty"`
+	ListenPort      int                    `yaml:"listen_port,omitempty"`
+	ContainerPort   int                    `yaml:"container_port,omitempty"`
+	UpstreamName    string                 `yaml:"upstream_name"`
+	ProxyConfig     *ProxyConfig           `yaml:"proxy_config,omitempty"`
+	// SNI 路由相关字段
+	EnableSNI       bool                   `yaml:"enable_sni,omitempty"`
+	DomainRoutes    map[string]string      `yaml:"domain_routes,omitempty"`
+	StaticUpstreams map[string][]string    `yaml:"static_upstreams,omitempty"` // 静态upstream配置
 }
 
 // ProxyConfig 代理配置
@@ -129,7 +134,8 @@ func (c *Config) ValidateService(service *ServiceConfig) error {
 	if service.Type != "http" && service.Type != "stream" {
 		return fmt.Errorf("服务 %s 的 type 必须是 http 或 stream", service.Name)
 	}
-	if service.ContainerName == "" {
+	// 对于启用SNI的stream服务，不强制要求container_name
+	if service.ContainerName == "" && !(service.Type == "stream" && service.EnableSNI) {
 		return fmt.Errorf("服务 %s 的 container_name 不能为空", service.Name)
 	}
 	if service.UpstreamName == "" {

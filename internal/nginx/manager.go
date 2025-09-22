@@ -36,9 +36,13 @@ type HTTPConfig struct {
 
 // StreamConfig Stream服务配置
 type StreamConfig struct {
-	ServiceName string
-	ListenPort  int
-	Upstream    []UpstreamServer
+	ServiceName     string
+	ListenPort      int
+	Upstream        []UpstreamServer
+	// SNI 路由相关字段
+	EnableSNI       bool
+	DomainRoutes    map[string]string     // 域名到upstream的映射
+	StaticUpstreams map[string][]string   // 静态upstream配置
 }
 
 // UpstreamServer 上游服务器
@@ -67,9 +71,14 @@ type HTTPTemplateData struct {
 
 // StreamTemplateData Stream配置模板数据
 type StreamTemplateData struct {
-	ServiceName string
-	ListenPort  int
-	Upstream    []UpstreamServer
+	ServiceName   string
+	ListenPort    int
+	Upstream      []UpstreamServer
+	// SNI 路由相关字段
+	EnableSNI     bool
+	DomainRoutes  map[string]string       // 域名到upstream的映射
+	DefaultRoute  string                  // 默认路由
+	StaticUpstreams map[string][]string   // 静态upstream配置
 }
 
 // loadTemplate 从文件加载模板内容
@@ -161,9 +170,12 @@ func (m *Manager) updateStreamService(service *config.ServiceConfig, containerIP
 	streamConfig, exists := m.streamConfigs[service.Name]
 	if !exists {
 		streamConfig = &StreamConfig{
-			ServiceName: service.Name,
-			ListenPort:  service.ListenPort,
-			Upstream:    make([]UpstreamServer, 0),
+			ServiceName:     service.Name,
+			ListenPort:      service.ListenPort,
+			Upstream:        make([]UpstreamServer, 0),
+			EnableSNI:       service.EnableSNI,
+			DomainRoutes:    service.DomainRoutes,
+			StaticUpstreams: service.StaticUpstreams,
 		}
 		m.streamConfigs[service.Name] = streamConfig
 	}
@@ -231,8 +243,9 @@ func (m *Manager) generateHTTPConfig(httpConfig *HTTPConfig) error {
 
 // generateStreamConfig 生成Stream配置文件
 func (m *Manager) generateStreamConfig(streamConfig *StreamConfig) error {
-	if len(streamConfig.Upstream) == 0 {
-		// 如果没有上游服务器，删除配置文件
+	// 对于SNI配置，即使Upstream为空也要生成配置（使用StaticUpstreams）
+	if len(streamConfig.Upstream) == 0 && !streamConfig.EnableSNI {
+		// 如果没有上游服务器且不是SNI配置，删除配置文件
 		return m.deleteStreamConfig(streamConfig.ServiceName)
 	}
 
@@ -304,13 +317,27 @@ func (m *Manager) buildHTTPConfigContent(httpConfig *HTTPConfig) string {
 func (m *Manager) buildStreamConfigContent(streamConfig *StreamConfig) string {
 	// 准备模板数据
 	templateData := StreamTemplateData{
-		ServiceName: streamConfig.ServiceName,
-		ListenPort:  streamConfig.ListenPort,
-		Upstream:    streamConfig.Upstream,
+		ServiceName:     streamConfig.ServiceName,
+		ListenPort:      streamConfig.ListenPort,
+		Upstream:        streamConfig.Upstream,
+		EnableSNI:       streamConfig.EnableSNI,
+		DomainRoutes:    streamConfig.DomainRoutes,
+		DefaultRoute:    streamConfig.ServiceName,
+		StaticUpstreams: streamConfig.StaticUpstreams,
+	}
+
+	// 选择合适的模板文件
+	templateFile := m.config.Global.StreamTemplateFile
+	if streamConfig.EnableSNI {
+		// 如果启用SNI，使用SNI模板
+		templateFile = m.config.Global.StreamSNITemplateFile
+		if templateFile == "" {
+			templateFile = "conf/stream-sni.conf.tpl" // 默认SNI模板路径
+		}
 	}
 
 	// 加载模板内容
-	templateContent, err := m.loadTemplate(m.config.Global.StreamTemplateFile)
+	templateContent, err := m.loadTemplate(templateFile)
 	if err != nil {
 		log.Printf("加载Stream配置模板失败: %v", err)
 		return ""
