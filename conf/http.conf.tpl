@@ -51,6 +51,14 @@ server {
 
         proxy_pass http://{{ .ServiceName }}/;
 
+        # 增加代理缓冲区设置
+        proxy_buffering on;
+        proxy_buffer_size 16k;
+        proxy_buffers 8 16k;
+        proxy_busy_buffers_size 32k;
+        proxy_max_temp_file_size 1024m;
+        proxy_temp_file_write_size 64k;
+
         {{- if .ProxyHTTPVersion }}
         proxy_http_version {{ .ProxyHTTPVersion }};
         {{- end }}
@@ -82,6 +90,14 @@ server {
         {{- end }}
 
         proxy_pass http://{{ .ServiceName }}/;
+
+        # 增加代理缓冲区设置
+        proxy_buffering on;
+        proxy_buffer_size 16k;
+        proxy_buffers 8 16k;
+        proxy_busy_buffers_size 32k;
+        proxy_max_temp_file_size 1024m;
+        proxy_temp_file_write_size 64k;
 
         {{- if .ProxyHTTPVersion }}
         proxy_http_version {{ .ProxyHTTPVersion }};
